@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bufio"
-	"crypto/tls"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"sort"
@@ -94,68 +93,38 @@ func main() {
 // If the response is a 30x, visit follows the redirect.
 func visit(url *url.URL) {
 	scheme := url.Scheme
-	hostport := url.Host
-	host, port := func() (string, string) {
-		host, port, err := net.SplitHostPort(hostport)
-		if err != nil {
-			host = hostport
-		}
-		switch scheme {
-		case "https":
-			if port == "" {
-				port = "443"
+
+	var t0, t1, t2, t3, t4 time.Time
+
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(i httptrace.DNSStartInfo) { t0 = time.Now() },
+		DNSDone:  func(i httptrace.DNSDoneInfo) { t1 = time.Now() },
+		ConnectDone: func(net, addr string, err error) {
+			if err != nil {
+				log.Fatalf("unable to connect to host %v %v", addr, err)
 			}
-		case "http":
-			if port == "" {
-				port = "80"
-			}
-		default:
-			log.Fatalf("unsupported url scheme %q", scheme)
-		}
-		return host, port
-	}()
-
-	t0 := time.Now() // before dns resolution
-	raddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%s", host, port))
-	if err != nil {
-		log.Fatalf("unable to resolve host: %v", err)
+			t2 = time.Now()
+		},
+		WroteRequest:         func(i httptrace.WroteRequestInfo) { t3 = time.Now() },
+		GotFirstResponseByte: func() { t4 = time.Now() },
 	}
 
-	var conn net.Conn
-	t1 := time.Now() // after dns resolution, before connect
-	conn, err = net.DialTCP("tcp", nil, raddr)
-	if err != nil {
-		log.Fatalf("unable to connect to host %vv %v", raddr, err)
-	}
-
-	var t2 time.Time // after connect, before TLS handshake
-	if scheme == "https" {
-		t2 = time.Now()
-		c := tls.Client(conn, &tls.Config{InsecureSkipVerify: true})
-		if err := c.Handshake(); err != nil {
-			log.Fatalf("unable to negotiate TLS handshake: %v", err)
-		}
-		conn = c
-	}
-
-	t3 := time.Now() // after connect, before request
 	if onlyHeader {
 		httpMethod = "HEAD"
 	}
 	if (httpMethod == "POST" || httpMethod == "PUT") && postBody == "" {
 		log.Fatal("must supply post body using -d when POST or PUT is used")
 	}
+
 	req, err := http.NewRequest(httpMethod, url.String(), strings.NewReader(postBody))
+
 	if err != nil {
 		log.Fatalf("unable to create request: %v", err)
 	}
+	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
 
-	if err := req.Write(conn); err != nil {
-		log.Fatalf("failed to write request: %v", err)
-	}
+	resp, err := http.DefaultClient.Do(req)
 
-	t4 := time.Now() // after request, before read response
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		log.Fatalf("failed to read response: %v", err)
 	}
