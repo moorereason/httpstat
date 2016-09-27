@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"net"
 )
 
 const (
@@ -63,6 +63,7 @@ var (
 	httpHeaders     headers
 	saveOutput      bool
 	outputFile      string
+	proxyURL        string
 
 	// number of redirects followed
 	redirectsFollowed int
@@ -81,6 +82,7 @@ func init() {
 	flag.Var(&httpHeaders, "H", "HTTP Header(s) to set. Can be used multiple times. -H 'Accept:...' -H 'Range:....'")
 	flag.BoolVar(&saveOutput, "O", false, "Save body as remote filename")
 	flag.StringVar(&outputFile, "o", "", "output file for body")
+	flag.StringVar(&proxyURL, "x", "", "proxy URL")
 
 	flag.Usage = func() {
 		os.Stderr.WriteString(usage + "\n")
@@ -216,6 +218,9 @@ func visit(url *url.URL) {
 	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
 
 	tr := &http.Transport{}
+	if proxyURL != "" {
+		tr.Proxy = http.ProxyURL(parseURL(proxyURL))
+	}
 	if scheme == "https" {
 		tr.TLSClientConfig = &tls.Config{
 			ServerName:         host,
