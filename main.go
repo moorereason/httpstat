@@ -154,9 +154,16 @@ func visit(url *url.URL) {
 	var t0, t1, t2, t3, t4 time.Time
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(_ httptrace.DNSStartInfo) { t0 = time.Now() },
-		DNSDone:  func(_ httptrace.DNSDoneInfo) { t1 = time.Now() },
+		DNSStart: func(_ httptrace.DNSStartInfo) {
+			t0 = time.Now()
+			println(". DNSStart")
+		},
+		DNSDone: func(_ httptrace.DNSDoneInfo) {
+			t1 = time.Now()
+			println(". DNSDone")
+		},
 		ConnectDone: func(net, addr string, err error) {
+			println(". ConnectDone")
 			if err != nil {
 				log.Fatalf("unable to connect to host %v: %v", addr, err)
 			}
@@ -164,8 +171,21 @@ func visit(url *url.URL) {
 
 			printf("\n%s%s\n", color.GreenString("Connected to "), color.CyanString(addr))
 		},
-		WroteRequest:         func(_ httptrace.WroteRequestInfo) { t3 = time.Now() },
-		GotFirstResponseByte: func() { t4 = time.Now() },
+		WroteRequest: func(_ httptrace.WroteRequestInfo) {
+			t3 = time.Now()
+			println(". WroteRequest")
+		},
+		GotFirstResponseByte: func() {
+			t4 = time.Now()
+			println(". GotFirstResponseByte")
+		},
+		GetConn:         func(_ string) { println(". GetConn") },
+		GotConn:         func(_ httptrace.GotConnInfo) { println(". GotConn") },
+		PutIdleConn:     func(_ error) { println(". PutIdleConn") },
+		Got100Continue:  func() { println(". Got100Continue") },
+		Wait100Continue: func() { println(". Wait100Continue") },
+		WroteHeaders:    func() { println(". WroteHeaders") },
+		ConnectStart:    func(_, _ string) { println(". ConnectStart") },
 	}
 	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
 
