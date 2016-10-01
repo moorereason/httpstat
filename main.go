@@ -152,40 +152,54 @@ func visit(url *url.URL) {
 	req := newRequest(httpMethod, url, postBody)
 
 	var t0, t1, t2, t3, t4 time.Time
+	var tConnectStart, tGetConn, tWroteHeaders, tWroteRequest time.Time
 
 	trace := &httptrace.ClientTrace{
+		GetConn: func(_ string) {
+			tGetConn = time.Now()
+			fmt.Printf(". GetConn\n")
+		},
 		DNSStart: func(_ httptrace.DNSStartInfo) {
 			t0 = time.Now()
-			println(". DNSStart")
+			fmt.Printf(". DNSStart %s since GetConn\n", t0.Sub(tGetConn))
 		},
 		DNSDone: func(_ httptrace.DNSDoneInfo) {
 			t1 = time.Now()
-			println(". DNSDone")
+			fmt.Printf(". DNSDone %s since DNSStart\n", t1.Sub(t0))
+		},
+		ConnectStart: func(_, _ string) {
+			tConnectStart = time.Now()
+			fmt.Printf(". ConnectStart %s since DNSDone\n", tConnectStart.Sub(t1))
 		},
 		ConnectDone: func(net, addr string, err error) {
-			println(". ConnectDone")
 			if err != nil {
 				log.Fatalf("unable to connect to host %v: %v", addr, err)
 			}
 			t2 = time.Now()
 
 			printf("\n%s%s\n", color.GreenString("Connected to "), color.CyanString(addr))
+			fmt.Printf(". ConnectDone %s since DNSDone\n", t2.Sub(t1))
+		},
+		WroteHeaders: func() {
+			tWroteHeaders = time.Now()
+			fmt.Printf(". WroteHeaders: %s since GotConn\n", time.Now().Sub(t3))
+			fmt.Printf(". . %s since ConnectDone\n", tWroteHeaders.Sub(t2))
 		},
 		WroteRequest: func(_ httptrace.WroteRequestInfo) {
-			t3 = time.Now()
-			println(". WroteRequest")
+			tWroteRequest = time.Now()
+			fmt.Printf(". WroteRequest %s since WroteHeaders\n", tWroteRequest.Sub(t3))
 		},
 		GotFirstResponseByte: func() {
 			t4 = time.Now()
-			println(". GotFirstResponseByte")
+			fmt.Printf(". GotFirstResponseByte %s since WroteRequest\n", t4.Sub(tWroteRequest))
 		},
-		GetConn:         func(_ string) { println(". GetConn") },
-		GotConn:         func(_ httptrace.GotConnInfo) { println(". GotConn") },
+		GotConn: func(i httptrace.GotConnInfo) {
+			t3 = time.Now()
+			fmt.Printf(". GotConn %s since ConnectDone\n", t3.Sub(t2))
+		},
 		PutIdleConn:     func(_ error) { println(". PutIdleConn") },
 		Got100Continue:  func() { println(". Got100Continue") },
 		Wait100Continue: func() { println(". Wait100Continue") },
-		WroteHeaders:    func() { println(". WroteHeaders") },
-		ConnectStart:    func(_, _ string) { println(". ConnectStart") },
 	}
 	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
 
