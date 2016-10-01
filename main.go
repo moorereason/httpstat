@@ -161,15 +161,15 @@ func visit(url *url.URL) {
 		},
 		DNSStart: func(_ httptrace.DNSStartInfo) {
 			t0 = time.Now()
-			fmt.Printf(". DNSStart %s since GetConn\n", t0.Sub(tGetConn))
+			fmt.Printf(". DNSStart %s after GetConn\n", t0.Sub(tGetConn))
 		},
 		DNSDone: func(_ httptrace.DNSDoneInfo) {
 			t1 = time.Now()
-			fmt.Printf(". DNSDone %s since DNSStart\n", t1.Sub(t0))
+			fmt.Printf(". DNSDone %s after DNSStart\n", t1.Sub(t0))
 		},
 		ConnectStart: func(_, _ string) {
 			tConnectStart = time.Now()
-			fmt.Printf(". ConnectStart %s since DNSDone\n", tConnectStart.Sub(t1))
+			fmt.Printf(". ConnectStart %s after DNSDone\n", tConnectStart.Sub(t1))
 		},
 		ConnectDone: func(net, addr string, err error) {
 			if err != nil {
@@ -178,24 +178,24 @@ func visit(url *url.URL) {
 			t2 = time.Now()
 
 			printf("\n%s%s\n", color.GreenString("Connected to "), color.CyanString(addr))
-			fmt.Printf(". ConnectDone %s since DNSDone\n", t2.Sub(t1))
+			fmt.Printf(". ConnectDone %s after ConnectStart\n", t2.Sub(tConnectStart))
 		},
 		WroteHeaders: func() {
 			tWroteHeaders = time.Now()
-			fmt.Printf(". WroteHeaders: %s since GotConn\n", time.Now().Sub(t3))
-			fmt.Printf(". . %s since ConnectDone\n", tWroteHeaders.Sub(t2))
+			fmt.Printf(". WroteHeaders: %s after GotConn\n", time.Now().Sub(t3))
+			fmt.Printf(". . %s after ConnectDone\n", tWroteHeaders.Sub(t2))
 		},
 		WroteRequest: func(_ httptrace.WroteRequestInfo) {
 			tWroteRequest = time.Now()
-			fmt.Printf(". WroteRequest %s since WroteHeaders\n", tWroteRequest.Sub(t3))
+			fmt.Printf(". WroteRequest %s after WroteHeaders\n", tWroteRequest.Sub(t3))
 		},
 		GotFirstResponseByte: func() {
 			t4 = time.Now()
-			fmt.Printf(". GotFirstResponseByte %s since WroteRequest\n", t4.Sub(tWroteRequest))
+			fmt.Printf(". GotFirstResponseByte %s after WroteRequest\n", t4.Sub(tWroteRequest))
 		},
 		GotConn: func(i httptrace.GotConnInfo) {
 			t3 = time.Now()
-			fmt.Printf(". GotConn %s since ConnectDone\n", t3.Sub(t2))
+			fmt.Printf(". GotConn %s after ConnectDone\n", t3.Sub(t2))
 		},
 		PutIdleConn:     func(_ error) { println(". PutIdleConn") },
 		Got100Continue:  func() { println(". Got100Continue") },
